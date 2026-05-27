@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Air Drums — Body as Controller</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #05050d;
+      color: #e0e0ff;
+      font-family: monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Mobile block ── */
+    #mobileBlock {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 40px;
+      text-align: center;
+      gap: 16px;
+    }
+
+    #mobileBlock h1 { font-size: 1rem; letter-spacing: 0.2em; color: #8888ff; }
+    #mobileBlock p  { font-size: 0.8rem; color: #444466; line-height: 1.8; }
+
+    @media (max-width: 860px) {
+      #mobileBlock { display: flex; }
+      #desktopApp  { display: none !important; }
+    }
+
+    #desktopApp {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+
+    /* ── Intro screen ── */
+    #introScreen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 840px;
+      padding: 40px 0;
+    }
+
+    #introScreen h1 {
+      font-size: 1.2rem;
+      letter-spacing: 0.3em;
+      color: #8888ff;
+      margin-bottom: 4px;
+    }
+
+    .tagline {
+      font-size: 0.7rem;
+      color: #333355;
+      letter-spacing: 0.2em;
+      margin-bottom: 36px;
+    }
+
+    .intro-section {
+      width: 100%;
+      background: #0a0a18;
+      border: 1px solid #1a1a2a;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 12px;
+    }
+
+    .intro-section h2 {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      color: #333355;
+      margin-bottom: 14px;
+    }
+
+    .kit-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .kit-item {
+      padding: 10px 14px;
+      background: #080814;
+      border: 1px solid #12121f;
+      border-radius: 6px;
+      font-size: 0.7rem;
+    }
+
+    .kit-name { color: #8888ff; margin-bottom: 3px; }
+    .kit-desc { color: #444466; font-size: 0.65rem; line-height: 1.5; }
+
+    .kit-item.kick {
+      grid-column: 1 / -1;
+      border-color: #ff666622;
+      background: #100808;
+    }
+
+    .kit-item.kick .kit-name { color: #ff8866; }
+
+    .how-list {
+      list-style: none;
+      font-size: 0.75rem;
+      color: #555577;
+      line-height: 2;
+      counter-reset: steps;
+    }
+
+    .how-list li::before {
+      counter-increment: steps;
+      content: counter(steps) ". ";
+      color: #333355;
+    }
+
+    .how-list li span { color: #8888aa; }
+
+    .start-btn {
+      margin-top: 8px;
+      width: 100%;
+      padding: 16px;
+      background: #0f0f2a;
+      color: #8888ff;
+      border: 1px solid #222266;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 1rem;
+      letter-spacing: 0.15em;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .start-btn:hover { background: #16163a; }
+
+    .perm-note {
+      font-size: 0.65rem;
+      color: #222244;
+      margin-top: 8px;
+      text-align: center;
+    }
+
+    /* ── Performance screen ── */
+    #perfScreen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 0 32px;
+    }
+
+    #topBar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      width: 840px;
+      margin-bottom: 12px;
+      padding: 0 4px;
+    }
+
+    #topBar h1 {
+      font-size: 1rem;
+      letter-spacing: 0.25em;
+      color: #8888ff;
+    }
+
+    #topBar .sub {
+      font-size: 0.65rem;
+      color: #222244;
+      letter-spacing: 0.2em;
+    }
+
+    /* Canvas stack */
+    #canvasWrap {
+      position: relative;
+      width: 840px;
+      height: 520px;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 0 0 1px #1a1a2a,
+                  0 0 40px rgba(80, 80, 180, 0.08);
+    }
+
+    #canvasWrap canvas {
+      position: absolute;
+      top: 0; left: 0;
+    }
+
+    #handCanvas { pointer-events: none; }
+
+    /* Bottom bar */
+    #bottomBar {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      width: 840px;
+      margin-top: 12px;
+      padding: 12px 16px;
+      background: #0a0a18;
+      border: 1px solid #1a1a2a;
+      border-radius: 8px;
+    }
+
+    .stat-block {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .stat-label {
+      font-size: 0.55rem;
+      color: #333355;
+      letter-spacing: 0.15em;
+    }
+
+    .stat-value {
+      font-size: 0.9rem;
+      color: #8888ff;
+      letter-spacing: 0.05em;
+    }
+
+    .stat-value.kick-val { color: #ff8866; }
+
+    #kickIndicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #331111;
+      transition: background 0.05s;
+      flex-shrink: 0;
+    }
+
+    #kickIndicator.active { background: #ff8866; box-shadow: 0 0 8px #ff8866; }
+
+    /* Separator */
+    .sep {
+      width: 1px;
+      height: 32px;
+      background: #1a1a2a;
+      flex-shrink: 0;
+    }
+
+    /* Spacer */
+    .flex-spacer { flex: 1; }
+
+    /* Last hit display */
+    #lastHitLabel {
+      font-size: 0.7rem;
+      color: #333355;
+      transition: color 0.1s;
+    }
+
+    #video { display: none; }
+  </style>
+</head>
+<body>
+
+  <div id="mobileBlock">
+    <h1>AIR DRUMS</h1>
+    <p>This instrument needs a desktop browser.<br>
+    Visit on a laptop or desktop to play.</p>
+  </div>
+
+  <div id="desktopApp">
+
+    <!-- INTRO -->
+    <div id="introScreen">
+      <h1>AIR DRUMS</h1>
+      <div class="tagline">body as controller</div>
+
+      <div class="intro-section">
+        <h2>THE KIT</h2>
+        <div class="kit-grid">
+          <div class="kit-item">
+            <div class="kit-name">🥁 Snare</div>
+            <div class="kit-desc">Centre zone, either hand. Strike downward sharply.</div>
+          </div>
+          <div class="kit-item">
+            <div class="kit-name">🔔 Hi-Hat</div>
+            <div class="kit-desc">Inner top zone, either hand. Fast and light.</div>
+          </div>
+          <div class="kit-item">
+            <div class="kit-name">💥 Crash</div>
+            <div class="kit-desc">Outer top zone, either hand. Big sweeping strike.</div>
+          </div>
+          <div class="kit-item">
+            <div class="kit-name">🟤 Tom 1</div>
+            <div class="kit-desc">Mid zone, either hand. Deeper tone.</div>
+          </div>
+          <div class="kit-item">
+            <div class="kit-name">🟤 Tom 2</div>
+            <div class="kit-desc">Lower mid zone, either hand. Deeper still.</div>
+          </div>
+          <div class="kit-item kick">
+            <div class="kit-name">💢 Kick Drum</div>
+            <div class="kit-desc">Nod your head sharply downward. The biggest hit.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="intro-section">
+        <h2>HOW TO PLAY</h2>
+        <ol class="how-list">
+          <li>Click Start — allow microphone, camera, and face tracking</li>
+          <li>Position yourself so <span>both hands are visible</span> in the frame</li>
+          <li>Strike downward sharply into a zone to hit that drum</li>
+          <li><span>Harder strikes = louder hits</span> — velocity controls volume</li>
+          <li>Nod your head sharply downward to <span>trigger the kick</span></li>
+          <li>Watch the zones light up as you play</li>
+        </ol>
+      </div>
+
+      <button class="start-btn" id="startBtn">START PLAYING</button>
+      <div class="perm-note">will request camera access — no microphone needed</div>
+    </div>
+
+    <!-- PERFORMANCE -->
+    <div id="perfScreen">
+
+      <div id="topBar">
+        <h1>AIR DRUMS</h1>
+        <div class="sub">body as controller</div>
+      </div>
+
+      <div id="canvasWrap">
+        <canvas id="zoneCanvas" width="840" height="520"></canvas>
+        <canvas id="handCanvas" width="840" height="520"></canvas>
+      </div>
+
+      <div id="bottomBar">
+
+        <div class="stat-block">
+          <div class="stat-label">KICK</div>
+          <div class="stat-value kick-val" id="kickCount">0</div>
+        </div>
+
+        <div id="kickIndicator"></div>
+
+        <div class="sep"></div>
+
+        <div class="stat-block">
+          <div class="stat-label">BPM</div>
+          <div class="stat-value" id="bpmDisplay">—</div>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="stat-block">
+          <div class="stat-label">HITS</div>
+          <div class="stat-value" id="hitCount">0</div>
+        </div>
+
+        <div class="flex-spacer"></div>
+
+        <div id="lastHitLabel">—</div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <video id="video" autoplay playsinline></video>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+
+  <script>
+
+    // ═══════════════════════════════════════════════════════
+    // CONSTANTS
+    // ═══════════════════════════════════════════════════════
+
+    const W = 840;
+    const H = 520;
+
+    // How many frames of position history to keep per hand/nose
+    // More = smoother velocity calculation but more latency
+    const HISTORY_LEN = 6;
+
+    // Minimum downward velocity to count as a strike (0–1 normalised)
+    // Lower = more sensitive, Higher = fewer false triggers
+    const STRIKE_THRESHOLD  = 0.018;
+
+    // Minimum downward velocity for a nod to count as kick
+    const NOD_THRESHOLD     = 0.012;
+
+    // After a hit fires, ignore further hits for this many ms (prevents double triggers)
+    const HIT_COOLDOWN_MS   = 180;
+    const KICK_COOLDOWN_MS  = 300;
+
+    // How long a zone flash lasts in ms
+    const FLASH_DURATION_MS = 120;
+
+    // ═══════════════════════════════════════════════════════
+    // ZONE DEFINITIONS
+    //
+    // Each zone is defined as a fraction of the canvas (0–1).
+    // x: left edge, y: top edge, w: width, h: height
+    // All in normalised coords, converted to pixels when drawing.
+    //
+    // The canvas is mirrored (like a selfie camera) so left/right
+    // feel natural to the performer.
+    //
+    // Layout (from performer's perspective):
+    //   Crash   Hi-Hat  |  Hi-Hat  Crash
+    //   Tom 1   Tom 2   |  Tom 2   Tom 1
+    //      Snare         |     Snare
+    // ═══════════════════════════════════════════════════════
+
+    const ZONES = [
+      // LEFT SIDE (performer's left = screen right after mirror)
+      { id: 'crash-l',  name: 'CRASH',  x: 0.55, y: 0.04, w: 0.20, h: 0.22, color: '#ff8844' },
+      { id: 'hihat-l',  name: 'HI-HAT', x: 0.35, y: 0.04, w: 0.19, h: 0.22, color: '#ffdd44' },
+      { id: 'tom1-l',   name: 'TOM 1',  x: 0.55, y: 0.30, w: 0.20, h: 0.22, color: '#aa66ff' },
+      { id: 'tom2-l',   name: 'TOM 2',  x: 0.35, y: 0.30, w: 0.19, h: 0.22, color: '#8855ee' },
+      { id: 'snare-l',  name: 'SNARE',  x: 0.38, y: 0.57, w: 0.16, h: 0.22, color: '#4488ff' },
+
+      // RIGHT SIDE (performer's right = screen left after mirror)
+      { id: 'crash-r',  name: 'CRASH',  x: 0.25, y: 0.04, w: 0.20, h: 0.22, color: '#ff8844' },
+      { id: 'hihat-r',  name: 'HI-HAT', x: 0.46, y: 0.04, w: 0.19, h: 0.22, color: '#ffdd44' },
+      { id: 'tom1-r',   name: 'TOM 1',  x: 0.25, y: 0.30, w: 0.20, h: 0.22, color: '#aa66ff' },
+      { id: 'tom2-r',   name: 'TOM 2',  x: 0.46, y: 0.30, w: 0.19, h: 0.22, color: '#8855ee' },
+      { id: 'snare-r',  name: 'SNARE',  x: 0.46, y: 0.57, w: 0.16, h: 0.22, color: '#4488ff' },
+    ];
+
+    // Map zone id to drum type (zones on both sides map to same sound)
+    const ZONE_TO_DRUM = {
+      'crash-l':  'crash',
+      'crash-r':  'crash',
+      'hihat-l':  'hihat',
+      'hihat-r':  'hihat',
+      'tom1-l':   'tom1',
+      'tom1-r':   'tom1',
+      'tom2-l':   'tom2',
+      'tom2-r':   'tom2',
+      'snare-l':  'snare',
+      'snare-r':  'snare',
+    };
+
+    // ═══════════════════════════════════════════════════════
+    // DRUM SYNTHESISER
+    //
+    // Every drum sound is built from Web Audio primitives.
+    // No samples — pure synthesis.
+    //
+    // Each function creates a short burst of audio and
+    // automatically cleans up after itself.
+    // ═══════════════════════════════════════════════════════
+
+    let audioCtx = null;
+
+    function initAudio() {
+      audioCtx = new AudioContext();
+    }
+
+    // ── Utility: create a gain node with an instant attack ──
+    // and scheduled decay (so sounds don't click on cutoff)
+    function makeEnvelope(peakGain, decayTime) {
+      const env = audioCtx.createGain();
+      const now = audioCtx.currentTime;
+      env.gain.setValueAtTime(peakGain, now);
+      env.gain.exponentialRampToValueAtTime(0.001, now + decayTime);
+      env.connect(audioCtx.destination);
+
+      // Auto-disconnect after sound finishes
+      setTimeout(() => {
+        try { env.disconnect(); } catch(e) {}
+      }, decayTime * 1000 + 100);
+
+      return env;
+    }
+
+    // ── White noise buffer (shared, created once) ──────────
+    // White noise = random samples — used for snare, hi-hat, crash
+    let noiseBuffer = null;
+
+    function getNoiseBuffer() {
+      if (noiseBuffer) return noiseBuffer;
+      const frames = audioCtx.sampleRate * 2;
+      noiseBuffer  = audioCtx.createBuffer(1, frames, audioCtx.sampleRate);
+      const data   = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < frames; i++) data[i] = Math.random() * 2 - 1;
+      return noiseBuffer;
+    }
+
+    // ── KICK DRUM ──────────────────────────────────────────
+    // A sine wave whose pitch drops rapidly from high to low.
+    // That pitch drop is what gives kick drums their "thud".
+    function playKick(velocity = 1) {
+      const now  = audioCtx.currentTime;
+      const gain = velocity * 1.2;
+
+      const osc = audioCtx.createOscillator();
+      osc.type = 'sine';
+
+      // Pitch envelope: 150Hz → 40Hz over 0.15 seconds
+      osc.frequency.setValueAtTime(150, now);
+      osc.frequency.exponentialRampToValueAtTime(40, now + 0.15);
+
+      const env = makeEnvelope(gain, 0.4);
+      osc.connect(env);
+      osc.start(now);
+      osc.stop(now + 0.4);
+    }
+
+    // ── SNARE ──────────────────────────────────────────────
+    // A mix of a short pitched tone + filtered white noise burst.
+    // The noise gives the "crack", the tone gives the body.
+    function playSnare(velocity = 1) {
+      const now  = audioCtx.currentTime;
+      const gain = velocity * 0.9;
+
+      // Tonal component
+      const osc = audioCtx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(180, now);
+      osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+
+      const oscEnv = makeEnvelope(gain * 0.5, 0.12);
+      osc.connect(oscEnv);
+      osc.start(now);
+      osc.stop(now + 0.12);
+
+      // Noise component — filtered to mid frequencies
+      const noise  = audioCtx.createBufferSource();
+      noise.buffer = getNoiseBuffer();
+
+      const filter = audioCtx.createBiquadFilter();
+      filter.type            = 'bandpass';
+      filter.frequency.value = 2000;
+      filter.Q.value         = 0.8;
+
+      const noiseEnv = makeEnvelope(gain * 0.8, 0.15);
+      noise.connect(filter);
+      filter.connect(noiseEnv);
+      noise.start(now);
+      noise.stop(now + 0.15);
+    }
+
+    // ── HI-HAT ─────────────────────────────────────────────
+    // High-pass filtered white noise — very short, very bright.
+    function playHihat(velocity = 1) {
+      const now  = audioCtx.currentTime;
+      const gain = velocity * 0.6;
+
+      const noise  = audioCtx.createBufferSource();
+      noise.buffer = getNoiseBuffer();
+
+      const filter = audioCtx.createBiquadFilter();
+      filter.type            = 'highpass';
+      filter.frequency.value = 7000;
+
+      const env = makeEnvelope(gain, 0.08);
+      noise.connect(filter);
+      filter.connect(env);
+      noise.start(now);
+      noise.stop(now + 0.08);
+    }
+
+    // ── TOM 1 (higher tom) ─────────────────────────────────
+    // Like a kick but shorter decay and higher starting pitch.
+    function playTom1(velocity = 1) {
+      const now  = audioCtx.currentTime;
+      const gain = velocity * 1.0;
+
+      const osc = audioCtx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(200, now);
+      osc.frequency.exponentialRampToValueAtTime(80, now + 0.2);
+
+      const env = makeEnvelope(gain, 0.3);
+      osc.connect(env);
+      osc.start(now);
+      osc.stop(now + 0.3);
+    }
+
+    // ── TOM 2 (lower tom) ──────────────────────────────────
+    // Same as Tom 1 but lower pitch range.
+    function playTom2(velocity = 1) {
+      const now  = audioCtx.currentTime;
+      const gain = velocity * 1.0;
+
+      const osc = audioCtx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(140, now);
+      osc.frequency.exponentialRampToValueAtTime(55, now + 0.25);
+
+      const env = makeEnvelope(gain, 0.35);
+      osc.connect(env);
+      osc.start(now);
+      osc.stop(now + 0.35);
+    }
+
+    // ── CRASH ──────────────────────────────────────────────
+    // Broad band noise with a long slow decay.
+    // A bandpass filter gives it that metallic shimmer.
+    function playCrash(velocity = 1) {
+      const now  = audioCtx.currentTime;
+      const gain = velocity * 0.7;
+
+      const noise  = audioCtx.createBufferSource();
+      noise.buffer = getNoiseBuffer();
+
+      // Two filters in series for a more complex tone
+      const hipass = audioCtx.createBiquadFilter();
+      hipass.type            = 'highpass';
+      hipass.frequency.value = 3000;
+
+      const bandpass = audioCtx.createBiquadFilter();
+      bandpass.type            = 'bandpass';
+      bandpass.frequency.value = 6000;
+      bandpass.Q.value         = 0.5;
+
+      const env = makeEnvelope(gain, 1.2);
+      noise.connect(hipass);
+      hipass.connect(bandpass);
+      bandpass.connect(env);
+      noise.start(now);
+      noise.stop(now + 1.2);
+    }
+
+    // ── Dispatcher ─────────────────────────────────────────
+    const DRUM_FUNCTIONS = {
+      kick:  playKick,
+      snare: playSnare,
+      hihat: playHihat,
+      tom1:  playTom1,
+      tom2:  playTom2,
+      crash: playCrash,
+    };
+
+    function playDrum(drumName, velocity) {
+      const fn = DRUM_FUNCTIONS[drumName];
+      if (fn) fn(Math.min(velocity, 1));
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // ZONE RESOLUTION
+    //
+    // Given a normalised hand position (x, y in 0–1),
+    // find which zone it's in (if any).
+    // ═══════════════════════════════════════════════════════
+
+    function getZoneAt(nx, ny) {
+      for (const zone of ZONES) {
+        if (
+          nx >= zone.x && nx <= zone.x + zone.w &&
+          ny >= zone.y && ny <= zone.y + zone.h
+        ) {
+          return zone;
+        }
+      }
+      return null;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // STRIKE DETECTOR
+    //
+    // Tracks Y position history for each hand.
+    // A strike is detected when:
+    //   1. Recent velocity was positive (moving down)
+    //   2. Current velocity has dropped sharply (deceleration)
+    //   3. The peak velocity was above the threshold
+    //
+    // This catches the "bounce" at the bottom of a strike.
+    // ═══════════════════════════════════════════════════════
+
+    class StrikeDetector {
+      constructor(threshold, cooldownMs) {
+        this.threshold   = threshold;
+        this.cooldownMs  = cooldownMs;
+        this.history     = [];      // recent Y positions
+        this.lastHitTime = 0;
+        this.wasMovingDown = false;
+        this.peakVelocity  = 0;
+      }
+
+      // Call this every frame with the current normalised Y position
+      // Returns { hit: true, velocity: 0-1 } or { hit: false }
+      update(y) {
+        this.history.push(y);
+        if (this.history.length > HISTORY_LEN) this.history.shift();
+        if (this.history.length < 3) return { hit: false };
+
+        // Current velocity = difference between last two positions
+        const len  = this.history.length;
+        const vel  = this.history[len - 1] - this.history[len - 2];
+
+        // Previous velocity
+        const prevVel = this.history[len - 2] - this.history[len - 3];
+
+        // Track peak downward velocity
+        if (vel > 0) {
+          this.wasMovingDown = true;
+          this.peakVelocity  = Math.max(this.peakVelocity, vel);
+        }
+
+        // Detect the deceleration after a downward movement
+        // Hit fires when we were moving down and have now stopped/reversed
+        const decelerated = this.wasMovingDown && vel < prevVel * 0.5;
+        const aboveThresh = this.peakVelocity > this.threshold;
+        const cooledDown  = Date.now() - this.lastHitTime > this.cooldownMs;
+
+        if (decelerated && aboveThresh && cooledDown) {
+          const hitVelocity  = Math.min(this.peakVelocity / 0.08, 1);
+          this.lastHitTime   = Date.now();
+          this.wasMovingDown = false;
+          this.peakVelocity  = 0;
+          return { hit: true, velocity: hitVelocity };
+        }
+
+        // Reset if hand moved back up
+        if (vel < -this.threshold) {
+          this.wasMovingDown = false;
+          this.peakVelocity  = 0;
+        }
+
+        return { hit: false };
+      }
+    }
+
+    // One detector per hand, one for the nod
+    const detectors = {
+      left:  new StrikeDetector(STRIKE_THRESHOLD, HIT_COOLDOWN_MS),
+      right: new StrikeDetector(STRIKE_THRESHOLD, HIT_COOLDOWN_MS),
+      nod:   new StrikeDetector(NOD_THRESHOLD,    KICK_COOLDOWN_MS),
+    };
+
+    // ═══════════════════════════════════════════════════════
+    // ZONE FLASH SYSTEM
+    //
+    // When a zone is hit, we store it with a timestamp.
+    // The draw function uses that timestamp to calculate
+    // how bright the flash should be (fades over FLASH_DURATION_MS).
+    // ═══════════════════════════════════════════════════════
+
+    // Map from zone id → timestamp of last hit
+    const zoneFlashes = {};
+
+    function flashZone(zoneId) {
+      zoneFlashes[zoneId] = Date.now();
+    }
+
+    function getFlashIntensity(zoneId) {
+      const t = zoneFlashes[zoneId];
+      if (!t) return 0;
+      const age = Date.now() - t;
+      if (age > FLASH_DURATION_MS) return 0;
+      return 1 - age / FLASH_DURATION_MS;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // BPM ESTIMATOR
+    //
+    // Tracks timestamps of recent hits.
+    // BPM = 60 / average interval between hits (in seconds).
+    // We use a rolling window of the last 8 hits.
+    // ═══════════════════════════════════════════════════════
+
+    const hitTimestamps = [];
+    const BPM_WINDOW    = 8;
+
+    function recordHit() {
+      hitTimestamps.push(Date.now());
+      if (hitTimestamps.length > BPM_WINDOW + 1) hitTimestamps.shift();
+    }
+
+    function estimateBPM() {
+      if (hitTimestamps.length < 3) return null;
+      const intervals = [];
+      for (let i = 1; i < hitTimestamps.length; i++) {
+        intervals.push(hitTimestamps[i] - hitTimestamps[i - 1]);
+      }
+      const avgMs = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+      const bpm   = Math.round(60000 / avgMs);
+      return bpm > 20 && bpm < 300 ? bpm : null;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // ZONE CANVAS DRAWING
+    //
+    // Draws the kit layout every frame.
+    // Zones are normally very subtle — just faint outlines.
+    // On hit, they flash bright briefly.
+    // ═══════════════════════════════════════════════════════
+
+    const zoneCanvas = document.getElementById('zoneCanvas');
+    const zoneCtx    = zoneCanvas.getContext('2d');
+    const handCanvas = document.getElementById('handCanvas');
+    const handCtx    = handCanvas.getContext('2d');
+
+    function drawZones() {
+      // Dark background
+      zoneCtx.fillStyle = '#080810';
+      zoneCtx.fillRect(0, 0, W, H);
+
+      ZONES.forEach(zone => {
+        const x = zone.x * W;
+        const y = zone.y * H;
+        const w = zone.w * W;
+        const h = zone.h * H;
+
+        const flash = getFlashIntensity(zone.id);
+
+        // Parse zone colour for use in rgba
+        // Zone color is hex like '#ff8844'
+        const r = parseInt(zone.color.slice(1, 3), 16);
+        const g = parseInt(zone.color.slice(3, 5), 16);
+        const b = parseInt(zone.color.slice(5, 7), 16);
+
+        // Background fill — very subtle normally, bright on flash
+        const bgAlpha = 0.03 + flash * 0.25;
+        zoneCtx.fillStyle = `rgba(${r}, ${g}, ${b}, ${bgAlpha})`;
+        zoneCtx.beginPath();
+        zoneCtx.roundRect(x, y, w, h, 6);
+        zoneCtx.fill();
+
+        // Border — subtle normally, glows on flash
+        const borderAlpha = 0.08 + flash * 0.7;
+        zoneCtx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${borderAlpha})`;
+        zoneCtx.lineWidth   = 1 + flash * 2;
+        zoneCtx.beginPath();
+        zoneCtx.roundRect(x, y, w, h, 6);
+        zoneCtx.stroke();
+
+        // Zone label — centre of zone
+        const labelAlpha = 0.2 + flash * 0.8;
+        zoneCtx.fillStyle   = `rgba(${r}, ${g}, ${b}, ${labelAlpha})`;
+        zoneCtx.font        = `${flash > 0.3 ? 'bold ' : ''}10px monospace`;
+        zoneCtx.textAlign   = 'center';
+        zoneCtx.fillText(zone.name, x + w / 2, y + h / 2 + 4);
+      });
+
+      // Subtle centre divider line
+      zoneCtx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+      zoneCtx.lineWidth   = 1;
+      zoneCtx.beginPath();
+      zoneCtx.moveTo(W / 2, 0);
+      zoneCtx.lineTo(W / 2, H);
+      zoneCtx.stroke();
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // HAND SKELETON DRAWING
+    // ═══════════════════════════════════════════════════════
+
+    const CONNECTIONS = [
+      [0,1],[1,2],[2,3],[3,4],
+      [0,5],[5,6],[6,7],[7,8],
+      [0,9],[9,10],[10,11],[11,12],
+      [0,13],[13,14],[14,15],[15,16],
+      [0,17],[17,18],[18,19],[19,20],
+      [5,9],[9,13],[13,17],
+    ];
+
+    function drawHands(allLandmarks) {
+      handCtx.clearRect(0, 0, W, H);
+
+      allLandmarks.forEach(landmarks => {
+        const toCanvas = lm => ({
+          x: (1 - lm.x) * W,
+          y: lm.y * H,
+        });
+
+        handCtx.strokeStyle = 'rgba(100, 100, 200, 0.4)';
+        handCtx.lineWidth   = 1.5;
+
+        CONNECTIONS.forEach(([a, b]) => {
+          const pa = toCanvas(landmarks[a]);
+          const pb = toCanvas(landmarks[b]);
+          handCtx.beginPath();
+          handCtx.moveTo(pa.x, pa.y);
+          handCtx.lineTo(pb.x, pb.y);
+          handCtx.stroke();
+        });
+
+        landmarks.forEach((lm, i) => {
+          const p     = toCanvas(lm);
+          const isTip = [4,8,12,16,20].includes(i);
+          handCtx.beginPath();
+          handCtx.arc(p.x, p.y, isTip ? 5 : 3, 0, Math.PI * 2);
+          handCtx.fillStyle = isTip ? '#8888ff' : '#4455aa';
+          handCtx.fill();
+        });
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // STATS UI
+    // ═══════════════════════════════════════════════════════
+
+    let totalHits  = 0;
+    let kickCount  = 0;
+
+    const bpmDisplay   = document.getElementById('bpmDisplay');
+    const hitCountEl   = document.getElementById('hitCount');
+    const kickCountEl  = document.getElementById('kickCount');
+    const kickIndicator = document.getElementById('kickIndicator');
+    const lastHitLabel = document.getElementById('lastHitLabel');
+
+    const DRUM_DISPLAY_NAMES = {
+      kick:  'KICK',
+      snare: 'SNARE',
+      hihat: 'HI-HAT',
+      tom1:  'TOM 1',
+      tom2:  'TOM 2',
+      crash: 'CRASH',
+    };
+
+    let lastHitTimeout = null;
+
+    function onHit(drumName, velocity) {
+      playDrum(drumName, velocity);
+      recordHit();
+      totalHits++;
+      hitCountEl.textContent = totalHits;
+
+      // Update BPM
+      const bpm = estimateBPM();
+      bpmDisplay.textContent = bpm ? bpm : '—';
+
+      // Last hit label
+      lastHitLabel.textContent = DRUM_DISPLAY_NAMES[drumName] || drumName;
+      lastHitLabel.style.color = '#8888ff';
+      clearTimeout(lastHitTimeout);
+      lastHitTimeout = setTimeout(() => {
+        lastHitLabel.style.color = '#333355';
+      }, 400);
+    }
+
+    function onKick(velocity) {
+      playDrum('kick', velocity);
+      recordHit();
+      kickCount++;
+      totalHits++;
+      kickCountEl.textContent = kickCount;
+      hitCountEl.textContent  = totalHits;
+
+      // Flash kick indicator
+      kickIndicator.classList.add('active');
+      setTimeout(() => kickIndicator.classList.remove('active'), 120);
+
+      lastHitLabel.textContent = 'KICK';
+      lastHitLabel.style.color = '#ff8866';
+      clearTimeout(lastHitTimeout);
+      lastHitTimeout = setTimeout(() => {
+        lastHitLabel.style.color = '#333355';
+      }, 400);
+
+      const bpm = estimateBPM();
+      bpmDisplay.textContent = bpm ? bpm : '—';
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // HAND TRACKING STATE + MEDIAPIPE
+    // ═══════════════════════════════════════════════════════
+
+    // Store latest hand landmarks for the draw loop
+    let latestHandLandmarks = [];
+
+    // Store nose Y for nod detection
+    let noseY = null;
+
+    function setupHandTracking() {
+      const hands = new Hands({
+        locateFile: file =>
+          `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+      });
+
+      hands.setOptions({
+        maxNumHands: 2,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.75,
+        minTrackingConfidence:  0.5,
+      });
+
+      hands.onResults(results => {
+        latestHandLandmarks = results.multiHandLandmarks || [];
+        const handedness    = results.multiHandedness    || [];
+
+        latestHandLandmarks.forEach((landmarks, idx) => {
+          // MediaPipe labels hands as 'Left' or 'Right' from the
+          // camera's perspective — which is mirrored for the performer.
+          // So we flip: camera 'Left' = performer's Right hand.
+          const label = handedness[idx]?.label;
+          const side  = label === 'Left' ? 'right' : 'left';
+
+          // Use wrist Y (landmark 0) for strike detection
+          // (more stable than fingertip for the gross motion)
+          const wristY = landmarks[0].y;
+          const result = detectors[side].update(wristY);
+
+          if (result.hit) {
+            // Find which zone the index fingertip is in
+            const tipX   = 1 - landmarks[8].x;   // mirrored x
+            const tipY   = landmarks[8].y;
+            const zone   = getZoneAt(tipX, tipY);
+
+            if (zone) {
+              const drumName = ZONE_TO_DRUM[zone.id];
+              flashZone(zone.id);
+              onHit(drumName, result.velocity);
+            }
+          }
+        });
+      });
+
+      const camera = new Camera(video, {
+        onFrame: async () => { await hands.send({ image: video }); },
+        width: W,
+        height: H,
+      });
+
+      camera.start();
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // FACE MESH — for nod detection
+    // ═══════════════════════════════════════════════════════
+
+    function setupFaceMesh() {
+      const faceMesh = new FaceMesh({
+        locateFile: file =>
+          `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+      });
+
+      faceMesh.setOptions({
+        maxNumFaces:            1,
+        refineLandmarks:        false,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence:  0.5,
+      });
+
+      faceMesh.onResults(results => {
+        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+          // Landmark 1 = nose tip
+          const nose = results.multiFaceLandmarks[0][1];
+          noseY = nose.y;
+
+          const result = detectors.nod.update(noseY);
+          if (result.hit) {
+            onKick(result.velocity);
+          }
+        }
+      });
+
+      // Face mesh uses the same video element as hands
+      // We create a second Camera instance pointing at the same video
+      const faceCamera = new Camera(video, {
+        onFrame: async () => { await faceMesh.send({ image: video }); },
+        width: W,
+        height: H,
+      });
+
+      faceCamera.start();
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // DRAW LOOP
+    // ═══════════════════════════════════════════════════════
+
+    function drawLoop() {
+      requestAnimationFrame(drawLoop);
+      drawZones();
+      drawHands(latestHandLandmarks);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // START
+    // ═══════════════════════════════════════════════════════
+
+    document.getElementById('startBtn').addEventListener('click', () => {
+      initAudio();
+      setupHandTracking();
+      setupFaceMesh();
+
+      document.getElementById('introScreen').style.display = 'none';
+      document.getElementById('perfScreen').style.display  = 'flex';
+
+      drawLoop();
+    });
+
+  </script>
+</body>
+</html>
