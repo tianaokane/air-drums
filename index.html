@@ -971,99 +971,87 @@
     // Store nose Y for nod detection
     let noseY = null;
 
-    function setupHandTracking() {
-      const hands = new Hands({
-        locateFile: file =>
-          `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-      });
+   function setupTracking() {
+  const hands = new Hands({
+    locateFile: file =>
+      `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${file}`
+  });
 
-      hands.setOptions({
-        maxNumHands: 2,
-        modelComplexity: 1,
-        minDetectionConfidence: 0.75,
-        minTrackingConfidence:  0.5,
-      });
+  hands.setOptions({
+    maxNumHands: 2,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.75,
+    minTrackingConfidence:  0.5,
+  });
 
-      hands.onResults(results => {
-        latestHandLandmarks = results.multiHandLandmarks || [];
-        const handedness    = results.multiHandedness    || [];
+  hands.onResults(results => {
+    latestHandLandmarks = results.multiHandLandmarks || [];
+    const handedness    = results.multiHandedness    || [];
 
-        latestHandLandmarks.forEach((landmarks, idx) => {
-          // MediaPipe labels hands as 'Left' or 'Right' from the
-          // camera's perspective — which is mirrored for the performer.
-          // So we flip: camera 'Left' = performer's Right hand.
-          const label = handedness[idx]?.label;
-          const side  = label === 'Left' ? 'right' : 'left';
+    latestHandLandmarks.forEach((landmarks, idx) => {
+      const label = handedness[idx]?.label;
+      const side  = label === 'Left' ? 'right' : 'left';
+      const wristY = landmarks[0].y;
+      const result = detectors[side].update(wristY);
 
-          // Use wrist Y (landmark 0) for strike detection
-          // (more stable than fingertip for the gross motion)
-          const wristY = landmarks[0].y;
-          const result = detectors[side].update(wristY);
-
-          if (result.hit) {
-            // Find which zone the index fingertip is in
-            const tipX   = 1 - landmarks[8].x;   // mirrored x
-            const tipY   = landmarks[8].y;
-            const zone   = getZoneAt(tipX, tipY);
-
-            if (zone) {
-              const drumName = ZONE_TO_DRUM[zone.id];
-              flashZone(zone.id);
-              onHit(drumName, result.velocity);
-            }
-          }
-        });
-      });
-
-      const camera = new Camera(video, {
-        onFrame: async () => { await hands.send({ image: video }); },
-        width: W,
-        height: H,
-      });
-
-      camera.start();
-    }
-
-    // ═══════════════════════════════════════════════════════
-    // FACE MESH — for nod detection
-    // ═══════════════════════════════════════════════════════
-
-    function setupFaceMesh() {
-      const faceMesh = new FaceMesh({
-        locateFile: file =>
-          `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-      });
-
-      faceMesh.setOptions({
-        maxNumFaces:            1,
-        refineLandmarks:        false,
-        minDetectionConfidence: 0.6,
-        minTrackingConfidence:  0.5,
-      });
-
-      faceMesh.onResults(results => {
-        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-          // Landmark 1 = nose tip
-          const nose = results.multiFaceLandmarks[0][1];
-          noseY = nose.y;
-
-          const result = detectors.nod.update(noseY);
-          if (result.hit) {
-            onKick(result.velocity);
-          }
+      if (result.hit) {
+        const tipX  = 1 - landmarks[8].x;
+        const tipY  = landmarks[8].y;
+        const zone  = getZoneAt(tipX, tipY);
+        if (zone) {
+          const drumName = ZONE_TO_DRUM[zone.id];
+          flashZone(zone.id);
+          onHit(drumName, result.velocity);
         }
-      });
+      }
+    });
+  });
 
-      // Face mesh uses the same video element as hands
-      // We create a second Camera instance pointing at the same video
-      const faceCamera = new Camera(video, {
-        onFrame: async () => { await faceMesh.send({ image: video }); },
-        width: W,
-        height: H,
-      });
+  const faceMesh = new FaceMesh({
+    locateFile: file =>
+      `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`
+  });
 
-      faceCamera.start();
+  faceMesh.setOptions({
+    maxNumFaces:            1,
+    refineLandmarks:        false,
+    minDetectionConfidence: 0.6,
+    minTrackingConfidence:  0.5,
+  });
+
+  faceMesh.onResults(results => {
+    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+      const nose = results.multiFaceLandmarks[0][1];
+      noseY = nose.y;
+      const result = detectors.nod.update(noseY);
+      if (result.hit) onKick(result.velocity);
     }
+  });
+
+  // ── ONE camera instance, feeds both models ──────────────
+  // This is the fix — alternating frames between the two models
+  // rather than two separate camera instances fighting over
+  // the same video source
+  let frameCount = 0;
+
+  const camera = new Camera(video, {
+    onFrame: async () => {
+      frameCount++;
+      // Send every frame to hands
+      await hands.send({ image: video });
+      // Send every other frame to face mesh
+      // Face mesh doesn't need full 60fps — every 2nd frame is fine
+      // and halves the processing load
+      if (frameCount % 2 === 0) {
+        await faceMesh.send({ image: video });
+      }
+    },
+    width:  W,
+    height: H,
+  });
+
+  camera.start();
+}
 
     // ═══════════════════════════════════════════════════════
     // DRAW LOOP
@@ -1080,9 +1068,8 @@
     // ═══════════════════════════════════════════════════════
 
     document.getElementById('startBtn').addEventListener('click', () => {
-      initAudio();
-      setupHandTracking();
-      setupFaceMesh();
+  initAudio();
+  setupTracking();
 
       document.getElementById('introScreen').style.display = 'none';
       document.getElementById('perfScreen').style.display  = 'flex';
